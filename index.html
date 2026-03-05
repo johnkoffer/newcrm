@@ -509,16 +509,22 @@ async function doLogout() {
 }
 
 async function onLogin(user) {
-    currentUserId = user.id;
-    document.getElementById('sidebar-user-email').textContent = user.email;
-    await loadFromSupabase();
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    document.getElementById('app').classList.add('flex');
-    initTheme();
-    updateDesignerSelects();
-    populateFilterYears();
-    renderProjects();
+    try {
+        currentUserId = user.id;
+        const emailEl = document.getElementById('sidebar-user-email');
+        if (emailEl) emailEl.textContent = user.email;
+        await loadFromSupabase();
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        document.getElementById('app').classList.add('flex');
+        initTheme();
+        updateDesignerSelects();
+        populateFilterYears();
+        renderProjects();
+    } catch(e) {
+        console.error('onLogin error:', e);
+        showLoginError('Помилка входу: ' + e.message);
+    }
 }
 
 // ====================================================================
@@ -546,10 +552,10 @@ async function loadFromSupabase() {
             .from('crm_data')
             .select('data')
             .eq('user_id', currentUserId)
-            .single();
-        if (error && error.code !== 'PGRST116') { console.error('Load error:', error); return; }
-        if (data) DB = { ...DB_DEFAULTS, ...data.data };
-    } catch(e) { console.error(e); }
+            .maybeSingle();
+        if (error) { console.warn('Load warning:', error.message); return; }
+        if (data && data.data) DB = { ...DB_DEFAULTS, ...data.data };
+    } catch(e) { console.warn('loadFromSupabase caught:', e.message); }
 }
 
 function saveData() {
@@ -560,7 +566,7 @@ function saveData() {
         try {
             const { error } = await sb
                 .from('crm_data')
-                .upsert({ user_id: currentUserId, data: DB }, { onConflict: 'user_id' });
+                .upsert({ user_id: currentUserId, data: DB, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
             if (error) { console.error('Save error:', error); setSaveStatus('error'); return; }
             setSaveStatus('saved');
         } catch(e) { console.error(e); setSaveStatus('error'); }
