@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="uk" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Studio</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-link { transition: all 0.2s ease; }
+        .sidebar-link:hover, .sidebar-link.active { background: rgba(99,102,241,0.15); color: #6366f1; }
+        .dark .sidebar-link:hover, .dark .sidebar-link.active { background: rgba(129,140,248,0.2); color: #818cf8; }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .modal-overlay { animation: modalIn 0.2s ease; }
+        @keyframes modalIn { from { opacity: 0; } to { opacity: 1; } }
+        .card-hover { transition: all 0.2s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        .status-none { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .status-advance { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+        .status-paid { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+        .dark .status-none { background: #450a0a; color: #fca5a5; border-color: #7f1d1d; }
+        .dark .status-advance { background: #451a03; color: #fcd34d; border-color: #78350f; }
+        .dark .status-paid { background: #052e16; color: #86efac; border-color: #14532d; }
+        table th { cursor: pointer; user-select: none; }
+        table th:hover { background: rgba(99,102,241,0.08); }
+        .sort-arrow { font-size: 0.65rem; margin-left: 4px; opacity: 0.5; }
+        .sort-arrow.active { opacity: 1; color: #6366f1; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        input[type="date"], input[type="datetime-local"], select { min-height: 38px; }
+        .tab-btn { transition: all 0.2s; }
+        .tab-btn.active { border-bottom: 2px solid #6366f1; color: #6366f1; font-weight: 600; }
+        .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+        #login-screen { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .saving-dot { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 min-h-screen transition-colors duration-300">
+
+<!-- ============================
+     ЕКРАН ВХОДУ
+============================= -->
+<div id="login-screen" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-8 fade-in">
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">CRM Studio</h1>
+            <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Увійдіть щоб продовжити</p>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                <input type="email" id="login-email" placeholder="your@email.com"
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                    onkeydown="if(event.key==='Enter') doLogin()">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Пароль</label>
+                <input type="password" id="login-password" placeholder="••••••••"
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                    onkeydown="if(event.key==='Enter') doLogin()">
+            </div>
+            <div id="login-error" class="hidden text-red-600 text-sm text-center bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2"></div>
+            <button onclick="doLogin()" id="login-btn"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-sm font-semibold transition-colors">
+                Увійти
+            </button>
+        </div>
+        <p class="text-center text-xs text-gray-400 mt-6">Захищено Supabase Auth</p>
+    </div>
+</div>
+
+<!-- ============================
+     ОСНОВНИЙ ІНТЕРФЕЙС
+============================= -->
+<div id="app" class="hidden flex min-h-screen">
+
+    <!-- БІЧНА ПАНЕЛЬ -->
+    <aside id="sidebar" class="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col fixed h-full z-30 transition-transform duration-300 lg:translate-x-0 -translate-x-full">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-800">
+            <h1 class="text-xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                CRM Studio
+            </h1>
+            <p class="text-xs text-gray-400 mt-1" id="sidebar-user-email">Завантаження...</p>
+        </div>
+
+        <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+            <button onclick="navigateTo('3d')" data-nav="3d" class="sidebar-link active w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                3D Візуалізація
+                <span id="nav-badge-3d" class="ml-auto text-xs bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-full">0</span>
+            </button>
+            <button onclick="navigateTo('photo')" data-nav="photo" class="sidebar-link w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Фотографія
+            </button>
+            <button onclick="navigateTo('other')" data-nav="other" class="sidebar-link w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Інші доходи
+            </button>
+            <button onclick="navigateTo('designers')" data-nav="designers" class="sidebar-link w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Дизайнери
+            </button>
+            <button onclick="navigateTo('archive')" data-nav="archive" class="sidebar-link w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                Архів
+            </button>
+            <button onclick="navigateTo('trash')" data-nav="trash" class="sidebar-link w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Кошик
+            </button>
+            <button onclick="navigateTo('stats')" data-nav="stats" class="sidebar-link w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                Статистика
+            </button>
+        </nav>
+
+        <div class="p-3 border-t border-gray-200 dark:border-gray-800 space-y-1">
+            <!-- Статус збереження -->
+            <div class="px-4 py-1.5 flex items-center gap-2">
+                <span id="save-status-dot" class="w-2 h-2 rounded-full bg-green-500 shrink-0"></span>
+                <span id="save-status-label" class="text-xs text-gray-400 truncate">Збережено в хмарі</span>
+            </div>
+            <button onclick="toggleTheme()" class="sidebar-link w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300">
+                <svg class="w-5 h-5 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <span class="dark:hidden">Темна тема</span>
+                <span class="hidden dark:inline">Світла тема</span>
+            </button>
+            <button onclick="exportData()" class="sidebar-link w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Експорт даних
+            </button>
+            <label class="sidebar-link w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                Імпорт даних
+                <input type="file" accept=".json" onchange="importData(event)" class="hidden">
+            </label>
+            <button onclick="doLogout()" class="sidebar-link w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-500 dark:text-red-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                Вийти
+            </button>
+        </div>
+    </aside>
+
+    <!-- ОСНОВНИЙ КОНТЕНТ -->
+    <main class="flex-1 lg:ml-64 min-h-screen">
+        <header class="lg:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-4 flex items-center justify-between sticky top-0 z-20">
+            <button onclick="toggleSidebar()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <h1 class="text-lg font-bold text-indigo-600 dark:text-indigo-400">CRM Studio</h1>
+            <div class="w-10"></div>
+        </header>
+
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-20 hidden lg:hidden" onclick="toggleSidebar()"></div>
+
+        <div class="p-4 md:p-6 lg:p-8">
+            <!-- СЕКЦІЯ 3D -->
+            <section id="section-3d" class="section fade-in">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold">3D Візуалізація</h2>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Управління проектами з 3D візуалізації</p>
+                    </div>
+                    <button onclick="openProjectModal()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Новий проект
+                    </button>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-4 flex flex-wrap gap-3 items-end">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Пошук</label>
+                        <input type="text" id="filter-3d-search" oninput="renderProjects()" placeholder="Назва проекту..." class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm w-48 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Дизайнер</label>
+                        <select id="filter-3d-designer" onchange="renderProjects()" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm w-44 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+                            <option value="">Всі дизайнери</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Статус</label>
+                        <select id="filter-3d-status" onchange="renderProjects()" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm w-44 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+                            <option value="">Всі статуси</option>
+                            <option value="none">Немає оплати</option>
+                            <option value="advance">Є аванс</option>
+                            <option value="paid">Оплачено</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Рік</label>
+                        <select id="filter-3d-year" onchange="renderProjects()" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm w-28 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+                            <option value="">Всі</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Місяць</label>
+                        <select id="filter-3d-month" onchange="renderProjects()" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm w-36 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+                            <option value="">Всі</option>
+                            <option value="0">Січень</option><option value="1">Лютий</option><option value="2">Березень</option>
+                            <option value="3">Квітень</option><option value="4">Травень</option><option value="5">Червень</option>
+                            <option value="6">Липень</option><option value="7">Серпень</option><option value="8">Вересень</option>
+                            <option value="9">Жовтень</option><option value="10">Листопад</option><option value="11">Грудень</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="projects-summary" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"></div>
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm" id="projects-table">
+                            <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase text-gray-500 dark:text-gray-400">
+                                <tr>
+                                    <th class="px-4 py-3 text-left" onclick="sortProjects('date')">Дата <span class="sort-arrow" id="sort-3d-date">▼</span></th>
+                                    <th class="px-4 py-3 text-left" onclick="sortProjects('designer')">Дизайнер <span class="sort-arrow" id="sort-3d-designer">▼</span></th>
+                                    <th class="px-4 py-3 text-left" onclick="sortProjects('name')">Назва <span class="sort-arrow" id="sort-3d-name">▼</span></th>
+                                    <th class="px-4 py-3 text-right" onclick="sortProjects('area')">Площа, м² <span class="sort-arrow" id="sort-3d-area">▼</span></th>
+                                    <th class="px-4 py-3 text-right" onclick="sortProjects('price')">$/м² <span class="sort-arrow" id="sort-3d-price">▼</span></th>
+                                    <th class="px-4 py-3 text-right" onclick="sortProjects('total')">Сума, $ <span class="sort-arrow" id="sort-3d-total">▼</span></th>
+                                    <th class="px-4 py-3 text-right" onclick="sortProjects('debt')">Борг, $ <span class="sort-arrow" id="sort-3d-debt">▼</span></th>
+                                    <th class="px-4 py-3 text-center">Статус</th>
+                                    <th class="px-4 py-3 text-center">Дії</th>
+                                </tr>
+                            </thead>
+                            <tbody id="projects-tbody" class="divide-y divide-gray-100 dark:divide-gray-800"></tbody>
+                        </table>
+                    </div>
+                    <div id="projects-empty" class="hidden p-12 text-center text-gray-400">
+                        <svg class="w-16 h-16 mx-auto mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        <p class="font-medium">Проектів поки немає</p>
+                        <p class="text-sm mt-1">Натисніть «Новий проект» щоб додати перший</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- СЕКЦІЯ ФОТОГРАФІЯ -->
+            <section id="section-photo" class="section fade-in hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold">Фотографія</h2>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Облік фотозйомок та відеозйомок</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="openLocationModal()" class="inline-flex items-center gap-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                            Локації
+                        </button>
+                        <button onclick="openPhotoModal()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Нова зйомка
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase text-gray-500 dark:text-gray-400">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">Дата і час</th>
+                                    <th class="px-4 py-3 text-left">Тип зйомки</th>
+                                    <th class="px-4 py-3 text-left">Локація</th>
+                                    <th class="px-4 py-3 text-left">Модель</th>
+                                    <th class="px-4 py-3 text-right">Сума, ₴</th>
+                                    <th class="px-4 py-3 text-center">Дії</th>
+                                </tr>
+                            </thead>
+                            <tbody id="photo-tbody" class="divide-y divide-gray-100 dark:divide-gray-800"></tbody>
+                        </table>
+                    </div>
+                    <div id="photo-empty" class="hidden p-12 text-center text-gray-400"><p class="font-medium">Зйомок поки немає</p></div>
+                </div>
+            </section>
+
+            <!-- СЕКЦІЯ ІНШІ ДОХОДИ -->
+            <section id="section-other" class="section fade-in hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold">Інші доходи</h2>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Додаткові джерела доходу</p>
+                    </div>
+                    <button onclick="openOtherIncomeModal()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Новий запис
+                    </button>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase text-gray-500 dark:text-gray-400">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">Дата</th>
+                                    <th class="px-4 py-3 text-left">Опис</th>
+                                    <th class="px-4 py-3 text-right">Сума, ₴</th>
+                                    <th class="px-4 py-3 text-center">Дії</th>
+                                </tr>
+                            </thead>
+                            <tbody id="other-tbody" class="divide-y divide-gray-100 dark:divide-gray-800"></tbody>
+                        </table>
+                    </div>
+                    <div id="other-empty" class="hidden p-12 text-center text-gray-400"><p class="font-medium">Записів поки немає</p></div>
+                </div>
+            </section>
+
+            <!-- СЕКЦІЯ ДИЗАЙНЕРИ -->
+            <section id="section-designers" class="section fade-in hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold">Дизайнери</h2>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Управління списком дизайнерів</p>
+                    </div>
+                    <button onclick="openDesignerModal()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Новий дизайнер
+                    </button>
+                </div>
+                <div id="designers-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                <div id="designers-empty" class="hidden p-12 text-center text-gray-400"><p class="font-medium">Дизайнерів поки немає</p></div>
+            </section>
+
+            <!-- СЕКЦІЯ АРХІВ -->
+            <section id="section-archive" class="section fade-in hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold">Архів</h2>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Завершені та оплачені проекти</p>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase text-gray-500 dark:text-gray-400">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">Дата</th>
+                                    <th class="px-4 py-3 text-left">Дизайнер</th>
+                                    <th class="px-4 py-3 text-left">Назва</th>
+                                    <th class="px-4 py-3 text-right">Площа, м²</th>
+                                    <th class="px-4 py-3 text-right">Сума, $</th>
+                                    <th class="px-4 py-3 text-center">Дії</th>
+                                </tr>
+                            </thead>
+                            <tbody id="archive-tbody" class="divide-y divide-gray-100 dark:divide-gray-800"></tbody>
+                        </table>
+                    </div>
+                    <div id="archive-empty" class="hidden p-12 text-center text-gray-400"><p class="font-medium">Архів порожній</p></div>
+                </div>
+            </section>
+
+            <!-- СЕКЦІЯ КОШИК -->
+            <section id="section-trash" class="section fade-in hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold">Кошик</h2>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Видалені проекти</p>
+                    </div>
+                    <button onclick="emptyTrash()" id="btn-empty-trash" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                        Очистити кошик
+                    </button>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase text-gray-500 dark:text-gray-400">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">Дата</th>
+                                    <th class="px-4 py-3 text-left">Дизайнер</th>
+                                    <th class="px-4 py-3 text-left">Назва</th>
+                                    <th class="px-4 py-3 text-right">Сума, $</th>
+                                    <th class="px-4 py-3 text-center">Дії</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trash-tbody" class="divide-y divide-gray-100 dark:divide-gray-800"></tbody>
+                        </table>
+                    </div>
+                    <div id="trash-empty" class="hidden p-12 text-center text-gray-400"><p class="font-medium">Кошик порожній</p></div>
+                </div>
+            </section>
+
+            <!-- СЕКЦІЯ СТАТИСТИКА -->
+            <section id="section-stats" class="section fade-in hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold">Статистика</h2>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Аналітика та фінансові звіти</p>
+                </div>
+                <div class="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+                    <button onclick="switchStatsTab('general')" id="stats-tab-general" class="tab-btn active px-6 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-indigo-600">Загальна статистика</button>
+                    <button onclick="switchStatsTab('monthly')" id="stats-tab-monthly" class="tab-btn px-6 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-indigo-600">Деталі по місяцях</button>
+                </div>
+                <div id="stats-general" class="fade-in">
+                    <div class="flex flex-wrap gap-3 mb-6">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Рік</label>
+                            <select id="stats-year" onchange="renderStats()" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="">Всі роки</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="stats-cards" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6"></div>
+                    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+                        <h3 class="text-lg font-semibold mb-4">Доходи по місяцях</h3>
+                        <div id="stats-chart" class="overflow-x-auto overflow-y-visible"></div>
+                    </div>
+                </div>
+                <div id="stats-monthly" class="fade-in hidden">
+                    <div class="flex flex-wrap gap-3 mb-6">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Рік</label>
+                            <select id="stats-monthly-year" onchange="renderMonthlyDetails()" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="">Оберіть рік</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Місяць</label>
+                            <select id="stats-monthly-month" onchange="renderMonthlyDetails()" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="">Оберіть місяць</option>
+                                <option value="0">Січень</option><option value="1">Лютий</option><option value="2">Березень</option>
+                                <option value="3">Квітень</option><option value="4">Травень</option><option value="5">Червень</option>
+                                <option value="6">Липень</option><option value="7">Серпень</option><option value="8">Вересень</option>
+                                <option value="9">Жовтень</option><option value="10">Листопад</option><option value="11">Грудень</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="monthly-details-content"></div>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<!-- Модальні вікна -->
+<div id="modal" class="fixed inset-0 z-[55] hidden">
+    <div class="modal-overlay absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div class="relative flex items-start justify-center min-h-full p-4 pt-[5vh]">
+        <div id="modal-content" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-800"></div>
+    </div>
+</div>
+<div id="detail-modal" class="fixed inset-0 z-50 hidden">
+    <div class="modal-overlay absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeDetailModal()"></div>
+    <div class="relative flex items-start justify-center min-h-full p-4 pt-[3vh]">
+        <div id="detail-modal-content" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[94vh] overflow-y-auto border border-gray-200 dark:border-gray-800"></div>
+    </div>
+</div>
+<div id="confirm-modal" class="fixed inset-0 z-[60] hidden">
+    <div class="modal-overlay absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+    <div class="relative flex items-center justify-center min-h-full p-4">
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-gray-200 dark:border-gray-800">
+            <p id="confirm-text" class="text-center text-lg mb-6"></p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="confirmAction(false)" class="px-6 py-2.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium transition-colors">Скасувати</button>
+                <button onclick="confirmAction(true)" class="px-6 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors">Підтвердити</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="toast-container" class="fixed bottom-4 right-4 z-[70] space-y-2"></div>
+
+<script>
+// ====================================================================
+// ⚙️  НАЛАШТУВАННЯ SUPABASE — ЗАМІНІТЬ ЦІ ДВА РЯДКИ!
+// ====================================================================
+const SUPABASE_URL  = 'https://stnbdpgidapzxuckibie.supabase.co';
+const SUPABASE_KEY  = 'sb_publishable_Ew9sTaIhvym2rlwAHhbesw_7tH2KSDV';
+// ====================================================================
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const MONTHS_UA = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+
+function uuid() {
+    return 'xxxxxxxx-xxxx-4xxx'.replace(/[xy]/g, c => {
+        const r = Math.random()*16|0;
+        return (c==='x'?r:(r&0x3|0x8)).toString(16);
+    });
+}
+
+const DB_DEFAULTS = {
+    projects: [], designers: [], photoshoots: [],
+    locations: [], otherIncomes: [], settings: { theme: 'light' }
+};
+let DB = { ...DB_DEFAULTS };
+let currentUserId = null;
+let saveTimer = null;
+
+// ====================================================================
+// SUPABASE: АВТОРИЗАЦІЯ
+// ====================================================================
+async function doLogin() {
+    const email    = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const btn      = document.getElementById('login-btn');
+    const errBox   = document.getElementById('login-error');
+    errBox.classList.add('hidden');
+    if (!email || !password) { showLoginError('Введіть email та пароль'); return; }
+    btn.textContent = 'Вхід...'; btn.disabled = true;
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    btn.textContent = 'Увійти'; btn.disabled = false;
+    if (error) { showLoginError(error.message === 'Invalid login credentials' ? 'Невірний email або пароль' : error.message); return; }
+    await onLogin(data.user);
+}
+
+function showLoginError(msg) {
+    const el = document.getElementById('login-error');
+    el.textContent = msg; el.classList.remove('hidden');
+}
+
+async function doLogout() {
+    await sb.auth.signOut();
+    location.reload();
+}
+
+async function onLogin(user) {
+    currentUserId = user.id;
+    document.getElementById('sidebar-user-email').textContent = user.email;
+    await loadFromSupabase();
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('app').classList.add('flex');
+    initTheme();
+    updateDesignerSelects();
+    populateFilterYears();
+    renderProjects();
+}
+
+// ====================================================================
+// SUPABASE: ЗБЕРІГАННЯ ДАНИХ
+// ====================================================================
+function setSaveStatus(status) {
+    const dot   = document.getElementById('save-status-dot');
+    const label = document.getElementById('save-status-label');
+    if (!dot) return;
+    if (status === 'saving') {
+        dot.className = 'w-2 h-2 rounded-full bg-yellow-500 shrink-0 saving-dot';
+        label.textContent = 'Збереження...';
+    } else if (status === 'saved') {
+        dot.className = 'w-2 h-2 rounded-full bg-green-500 shrink-0';
+        label.textContent = 'Збережено в хмарі';
+    } else {
+        dot.className = 'w-2 h-2 rounded-full bg-red-500 shrink-0';
+        label.textContent = 'Помилка збереження';
+    }
+}
+
+async function loadFromSupabase() {
+    try {
+        const { data, error } = await sb
+            .from('crm_data')
+            .select('data')
+            .eq('user_id', currentUserId)
+            .single();
+        if (error && error.code !== 'PGRST116') { console.error('Load error:', error); return; }
+        if (data) DB = { ...DB_DEFAULTS, ...data.data };
+    } catch(e) { console.error(e); }
+}
+
+function saveData() {
+    // Дебаунс: зберігаємо в хмару не частіше ніж раз в 1 сек
+    clearTimeout(saveTimer);
+    setSaveStatus('saving');
+    saveTimer = setTimeout(async () => {
+        try {
+            const { error } = await sb
+                .from('crm_data')
+                .upsert({ user_id: currentUserId, data: DB }, { onConflict: 'user_id' });
+            if (error) { console.error('Save error:', error); setSaveStatus('error'); return; }
+            setSaveStatus('saved');
+        } catch(e) { console.error(e); setSaveStatus('error'); }
+    }, 800);
+}
+
+function fmt(n) { return parseFloat(n||0).toFixed(2); }
+
+// ====================================================================
+// ТЕМА
+// ====================================================================
+function initTheme() {
+    if (DB.settings.theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+    } else {
+        document.documentElement.classList.add('light');
+        document.documentElement.classList.remove('dark');
+    }
+}
+function toggleTheme() {
+    DB.settings.theme = DB.settings.theme === 'dark' ? 'light' : 'dark';
+    saveData(); initTheme();
+}
+
+// ====================================================================
+// НАВІГАЦІЯ
+// ====================================================================
+let currentSection = '3d';
+function navigateTo(section) {
+    currentSection = section;
+    document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+    document.getElementById('section-' + section)?.classList.remove('hidden');
+    document.querySelectorAll('[data-nav]').forEach(b => b.classList.toggle('active', b.dataset.nav === section));
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth < 1024) {
+        sidebar.classList.add('-translate-x-full');
+        document.getElementById('sidebar-overlay').classList.add('hidden');
+    }
+    if (section === '3d')       renderProjects();
+    if (section === 'photo')    renderPhotoshoots();
+    if (section === 'other')    renderOtherIncomes();
+    if (section === 'designers')renderDesigners();
+    if (section === 'archive')  renderArchive();
+    if (section === 'trash')    renderTrash();
+    if (section === 'stats')    { populateStatsYears(); renderStats(); }
+}
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('-translate-x-full');
+    document.getElementById('sidebar-overlay').classList.toggle('hidden');
+}
+
+// ====================================================================
+// TOAST
+// ====================================================================
+function showToast(msg, type='success') {
+    const container = document.getElementById('toast-container');
+    const colors = { success:'bg-green-600', error:'bg-red-600', info:'bg-indigo-600' };
+    const icons  = {
+        success:'<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+        error:'<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>',
+        info:'<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+    };
+    const toast = document.createElement('div');
+    toast.className = `${colors[type]} text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium fade-in flex items-center gap-2`;
+    toast.innerHTML = icons[type] + msg;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity='0'; toast.style.transition='opacity 0.3s'; setTimeout(()=>toast.remove(),300); }, 3000);
+}
+
+// ====================================================================
+// МОДАЛЬНІ ВІКНА
+// ====================================================================
+function openModal(html) {
+    document.getElementById('modal-content').innerHTML = html;
+    document.getElementById('modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+    document.getElementById('modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+function closeDetailModal() {
+    document.getElementById('detail-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+let confirmCallback = null;
+function showConfirm(text, callback) {
+    document.getElementById('confirm-text').textContent = text;
+    document.getElementById('confirm-modal').classList.remove('hidden');
+    confirmCallback = callback;
+}
+function confirmAction(yes) {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    if (yes && confirmCallback) confirmCallback();
+    confirmCallback = null;
+}
+
+// ====================================================================
+// ДОПОМІЖНІ
+// ====================================================================
+function getDesignerName(id) {
+    const d = DB.designers.find(x => x.id === id);
+    return d ? d.name : '—';
+}
+function getLocationName(id) {
+    const l = DB.locations.find(x => x.id === id);
+    return l ? l.name : '—';
+}
+
+// ====================================================================
+// ДИЗАЙНЕРИ
+// ====================================================================
+function renderDesigners() {
+    const grid  = document.getElementById('designers-grid');
+    const empty = document.getElementById('designers-empty');
+    if (!DB.designers.length) { grid.innerHTML=''; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    grid.innerHTML = DB.designers.map(d => {
+        const cnt = DB.projects.filter(p=>p.designerId===d.id&&!p.archived&&!p.deleted).length;
+        return `<div class="card-hover bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-sm">${d.name.charAt(0).toUpperCase()}</div>
+                <div class="flex-1 min-w-0"><p class="font-semibold truncate">${d.name}</p><p class="text-xs text-gray-400">${d.contacts||'Без контактів'}</p></div>
+            </div>
+            <p class="text-xs text-gray-500 mb-3">Активних проектів: ${cnt}</p>
+            <div class="flex gap-2">
+                <button onclick="openDesignerModal('${d.id}')" class="flex-1 text-xs py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors font-medium">Редагувати</button>
+                <button onclick="deleteDesigner('${d.id}')" class="text-xs py-1.5 px-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors font-medium">Видалити</button>
+            </div>
+        </div>`;
+    }).join('');
+    updateDesignerSelects();
+}
+
+function openDesignerModal(id=null) {
+    const d = id ? DB.designers.find(x=>x.id===id) : null;
+    openModal(`<div class="p-6">
+        <h3 class="text-lg font-bold mb-4">${d?'Редагувати дизайнера':'Новий дизайнер'}</h3>
+        <div class="space-y-3">
+            <div><label class="block text-sm font-medium mb-1">Ім'я *</label>
+                <input id="designer-name" value="${d?d.name:''}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Введіть ім'я"></div>
+            <div><label class="block text-sm font-medium mb-1">Контакти</label>
+                <input id="designer-contacts" value="${d?(d.contacts||''):''}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Телефон, email тощо"></div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium transition-colors">Скасувати</button>
+            <button onclick="saveDesigner('${id||''}')" class="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">Зберегти</button>
+        </div>
+    </div>`);
+}
+function saveDesigner(id) {
+    const name = document.getElementById('designer-name').value.trim();
+    if (!name) { showToast('Введіть ім\'я дизайнера','error'); return; }
+    if (id) {
+        const d = DB.designers.find(x=>x.id===id);
+        if (d) { d.name=name; d.contacts=document.getElementById('designer-contacts').value.trim(); }
+    } else {
+        DB.designers.push({ id:uuid(), name, contacts:document.getElementById('designer-contacts').value.trim() });
+    }
+    saveData(); closeModal(); renderDesigners(); showToast('Дизайнера збережено');
+}
+function deleteDesigner(id) {
+    if (DB.projects.some(p=>p.designerId===id&&!p.deleted)) { showToast('Неможливо видалити: дизайнер має проекти','error'); return; }
+    showConfirm('Видалити цього дизайнера?', () => {
+        DB.designers = DB.designers.filter(x=>x.id!==id);
+        saveData(); renderDesigners(); showToast('Дизайнера видалено');
+    });
+}
+function updateDesignerSelects() {
+    ['filter-3d-designer','project-designer'].forEach(sid => {
+        const sel = document.getElementById(sid);
+        if (!sel) return;
+        const val = sel.value;
+        sel.innerHTML = sid.startsWith('filter') ? '<option value="">Всі дизайнери</option>' : '<option value="">Оберіть дизайнера</option>';
+        DB.designers.forEach(d => { sel.innerHTML += `<option value="${d.id}">${d.name}</option>`; });
+        sel.value = val;
+    });
+}
+
+// ====================================================================
+// 3D ПРОЕКТИ
+// ====================================================================
+let projectSortField = 'date';
+let projectSortDir   = -1;
+
+function calcAdvancesSum(p) { return (p.advances||[]).reduce((s,a)=>s+parseFloat(a.amount||0),0); }
+function calcDebt(p)        { return Math.max(0, p.total - calcAdvancesSum(p)); }
+
+function renderProjects() {
+    const tbody         = document.getElementById('projects-tbody');
+    const empty         = document.getElementById('projects-empty');
+    const search        = document.getElementById('filter-3d-search')?.value.toLowerCase()||'';
+    const filterDes     = document.getElementById('filter-3d-designer')?.value||'';
+    const filterStatus  = document.getElementById('filter-3d-status')?.value||'';
+    const filterYear    = document.getElementById('filter-3d-year')?.value||'';
+    const filterMonth   = document.getElementById('filter-3d-month')?.value;
+
+    let projects = DB.projects.filter(p=>!p.archived&&!p.deleted);
+    if (search)        projects = projects.filter(p=>p.name.toLowerCase().includes(search));
+    if (filterDes)     projects = projects.filter(p=>p.designerId===filterDes);
+    if (filterStatus)  projects = projects.filter(p=>p.status===filterStatus);
+    if (filterYear)    projects = projects.filter(p=>new Date(p.date).getFullYear()===parseInt(filterYear));
+    if (filterMonth!==''&&filterMonth!==undefined) projects = projects.filter(p=>new Date(p.date).getMonth()===parseInt(filterMonth));
+
+    projects.sort((a,b)=>{
+        let va,vb;
+        switch(projectSortField){
+            case 'date':     va=new Date(a.date);vb=new Date(b.date);break;
+            case 'designer': va=getDesignerName(a.designerId);vb=getDesignerName(b.designerId);break;
+            case 'name':     va=a.name;vb=b.name;break;
+            case 'area':     va=a.area;vb=b.area;break;
+            case 'price':    va=a.pricePerSqm;vb=b.pricePerSqm;break;
+            case 'total':    va=a.total;vb=b.total;break;
+            case 'debt':     va=calcDebt(a);vb=calcDebt(b);break;
+            default:         va=a.date;vb=b.date;
+        }
+        if (typeof va==='string') return projectSortDir*va.localeCompare(vb);
+        return projectSortDir*(va-vb);
+    });
+
+    document.getElementById('nav-badge-3d').textContent = DB.projects.filter(p=>!p.archived&&!p.deleted).length;
+    const totalSum      = projects.reduce((s,p)=>s+p.total,0);
+    const totalAdvances = projects.reduce((s,p)=>s+calcAdvancesSum(p),0);
+    const totalDebt     = projects.reduce((s,p)=>s+calcDebt(p),0);
+    document.getElementById('projects-summary').innerHTML = `
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"><p class="text-xs text-gray-500 dark:text-gray-400">Проектів</p><p class="text-xl font-bold mt-1">${projects.length}</p></div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"><p class="text-xs text-gray-500 dark:text-gray-400">Загальна сума</p><p class="text-xl font-bold mt-1">$${fmt(totalSum)}</p></div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"><p class="text-xs text-gray-500 dark:text-gray-400">Отримано авансів</p><p class="text-xl font-bold mt-1 text-green-600">$${fmt(totalAdvances)}</p></div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"><p class="text-xs text-gray-500 dark:text-gray-400">Заборгованість</p><p class="text-xl font-bold mt-1 text-red-600">$${fmt(totalDebt)}</p></div>
+    `;
+    if (!projects.length) { tbody.innerHTML=''; empty.classList.remove('hidden'); populateFilterYears(); return; }
+    empty.classList.add('hidden');
+    const statusLabels  = { none:'Немає оплати', advance:'Є аванс', paid:'Оплачено' };
+    const statusClasses = { none:'status-none', advance:'status-advance', paid:'status-paid' };
+    tbody.innerHTML = projects.map(p=>{
+        const debt = calcDebt(p);
+        return `<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <td class="px-4 py-3 whitespace-nowrap">${new Date(p.date).toLocaleDateString('uk-UA')}</td>
+            <td class="px-4 py-3">${getDesignerName(p.designerId)}</td>
+            <td class="px-4 py-3 font-medium">${p.name}</td>
+            <td class="px-4 py-3 text-right">${fmt(p.area)}</td>
+            <td class="px-4 py-3 text-right">${fmt(p.pricePerSqm)}</td>
+            <td class="px-4 py-3 text-right font-semibold">$${fmt(p.total)}</td>
+            <td class="px-4 py-3 text-right font-semibold ${debt>0?'text-red-600':'text-green-600'}">$${fmt(debt)}</td>
+            <td class="px-4 py-3 text-center"><span class="badge ${statusClasses[p.status]}">${statusLabels[p.status]}</span></td>
+            <td class="px-4 py-3 text-center">
+                <div class="flex gap-1 justify-center">
+                    <button onclick="openProjectDetails('${p.id}')" class="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 transition-colors" title="Деталі">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    </button>
+                    ${p.status==='paid'?`<button onclick="archiveProject('${p.id}')" class="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 transition-colors" title="В архів">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                    </button>`:''}
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+    populateFilterYears();
+    updateDesignerSelects();
+}
+
+function sortProjects(field) {
+    if (projectSortField===field) projectSortDir*=-1;
+    else { projectSortField=field; projectSortDir=-1; }
+    document.querySelectorAll('[id^="sort-3d-"]').forEach(el=>{el.classList.remove('active');el.textContent='▼';});
+    const arrow = document.getElementById('sort-3d-'+field);
+    if (arrow) { arrow.classList.add('active'); arrow.textContent=projectSortDir===1?'▲':'▼'; }
+    renderProjects();
+}
+
+function populateFilterYears() {
+    const years = new Set();
+    DB.projects.forEach(p=>{if(p.date)years.add(new Date(p.date).getFullYear());});
+    DB.photoshoots.forEach(p=>{if(p.date)years.add(new Date(p.date).getFullYear());});
+    DB.otherIncomes.forEach(p=>{if(p.date)years.add(new Date(p.date).getFullYear());});
+    const sorted = [...years].sort((a,b)=>b-a);
+    const sel = document.getElementById('filter-3d-year');
+    if (!sel) return;
+    const val = sel.value;
+    sel.innerHTML = '<option value="">Всі</option>';
+    sorted.forEach(y=>{sel.innerHTML+=`<option value="${y}">${y}</option>`;});
+    sel.value = val;
+}
+
+function openProjectModal(id=null) {
+    const p = id ? DB.projects.find(x=>x.id===id) : null;
+    const designerOptions = DB.designers.map(d=>`<option value="${d.id}" ${p&&p.designerId===d.id?'selected':''}>${d.name}</option>`).join('');
+    openModal(`<div class="p-6">
+        <h3 class="text-lg font-bold mb-4">${p?'Редагувати проект':'Новий проект'}</h3>
+        <div class="space-y-3">
+            <div><label class="block text-sm font-medium mb-1">Дата початку *</label>
+                <input type="date" id="project-date" value="${p?p.date:new Date().toISOString().split('T')[0]}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+            <div><label class="block text-sm font-medium mb-1">Дизайнер *</label>
+                <select id="project-designer" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <option value="">Оберіть дизайнера</option>${designerOptions}</select></div>
+            <div><label class="block text-sm font-medium mb-1">Назва об'єкта *</label>
+                <input id="project-name" value="${p?p.name:''}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Назва проекту"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-sm font-medium mb-1">Площа, м²</label>
+                    <input type="number" step="0.01" id="project-area" value="${p?p.area:''}" oninput="calcProjectTotal()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0.00"></div>
+                <div><label class="block text-sm font-medium mb-1">Ціна за м², $</label>
+                    <input type="number" step="0.01" id="project-price" value="${p?p.pricePerSqm:''}" oninput="calcProjectTotal()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0.00"></div>
+            </div>
+            <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 text-center">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Загальна сума</p>
+                <p class="text-2xl font-bold text-indigo-600 dark:text-indigo-400" id="project-total-display">$${p?fmt(p.total):'0.00'}</p>
+            </div>
+            <div><label class="block text-sm font-medium mb-1">Статус оплати</label>
+                <select id="project-status" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <option value="none" ${p&&p.status==='none'?'selected':''}>Немає оплати</option>
+                    <option value="advance" ${p&&p.status==='advance'?'selected':''}>Є аванс</option>
+                    <option value="paid" ${p&&p.status==='paid'?'selected':''}>Оплачено</option>
+                </select></div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium transition-colors">Скасувати</button>
+            <button onclick="saveProject('${id||''}')" class="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">Зберегти</button>
+        </div>
+    </div>`);
+}
+function calcProjectTotal() {
+    const area  = parseFloat(document.getElementById('project-area')?.value)||0;
+    const price = parseFloat(document.getElementById('project-price')?.value)||0;
+    const d = document.getElementById('project-total-display');
+    if (d) d.textContent='$'+fmt(area*price);
+}
+function saveProject(id) {
+    const date       = document.getElementById('project-date').value;
+    const designerId = document.getElementById('project-designer').value;
+    const name       = document.getElementById('project-name').value.trim();
+    const area       = parseFloat(document.getElementById('project-area').value)||0;
+    const pricePerSqm= parseFloat(document.getElementById('project-price').value)||0;
+    const status     = document.getElementById('project-status').value;
+    if (!date||!designerId||!name) { showToast('Заповніть обов\'язкові поля','error'); return; }
+    const total = parseFloat((area*pricePerSqm).toFixed(2));
+    if (id) {
+        const p = DB.projects.find(x=>x.id===id);
+        if (p) Object.assign(p,{date,designerId,name,area,pricePerSqm,total,status});
+    } else {
+        DB.projects.push({id:uuid(),date,designerId,name,area,pricePerSqm,total,status,advances:[],archived:false,deleted:false});
+    }
+    saveData(); closeModal(); renderProjects(); showToast('Проект збережено');
+}
+
+// ====================================================================
+// ДЕТАЛІ ПРОЕКТУ
+// ====================================================================
+function openProjectDetails(id) {
+    const p = DB.projects.find(x=>x.id===id);
+    if (!p) return;
+    const statusClasses = {none:'status-none',advance:'status-advance',paid:'status-paid'};
+    const debt = calcDebt(p);
+    const advSum = calcAdvancesSum(p);
+    const designerOptions = DB.designers.map(dd=>`<option value="${dd.id}" ${p.designerId===dd.id?'selected':''}>${dd.name}</option>`).join('');
+    let advancesHtml = '';
+    if (p.advances&&p.advances.length) {
+        advancesHtml = p.advances.map((a,i)=>`
+            <div class="flex items-center gap-2 py-2 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                <span class="text-sm flex-shrink-0">${new Date(a.date).toLocaleDateString('uk-UA')}</span>
+                <span class="text-sm font-semibold text-green-600">$${fmt(a.amount)}</span>
+                <span class="text-xs text-gray-400 flex-1 truncate">${a.comment||''}</span>
+                <button onclick="editAdvance('${p.id}',${i})" class="p-1 text-indigo-500 hover:text-indigo-700"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                <button onclick="deleteAdvance('${p.id}',${i})" class="p-1 text-red-500 hover:text-red-700"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+            </div>`).join('');
+    } else {
+        advancesHtml = '<p class="text-gray-400 text-sm py-4 text-center">Авансів немає</p>';
+    }
+    document.getElementById('detail-modal-content').innerHTML = `
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold">Деталі проекту</h3>
+                <button onclick="closeDetailModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="space-y-3 mb-6">
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs font-medium text-gray-500 mb-1">Дата початку</label>
+                        <input type="date" id="detail-date" value="${p.date}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                    <div><label class="block text-xs font-medium text-gray-500 mb-1">Дизайнер</label>
+                        <select id="detail-designer" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">${designerOptions}</select></div>
+                </div>
+                <div><label class="block text-xs font-medium text-gray-500 mb-1">Назва об'єкта</label>
+                    <input id="detail-name" value="${p.name}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div><label class="block text-xs font-medium text-gray-500 mb-1">Площа, м²</label>
+                        <input type="number" step="0.01" id="detail-area" value="${p.area}" oninput="calcDetailTotal()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                    <div><label class="block text-xs font-medium text-gray-500 mb-1">Ціна за м², $</label>
+                        <input type="number" step="0.01" id="detail-price" value="${p.pricePerSqm}" oninput="calcDetailTotal()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                    <div><label class="block text-xs font-medium text-gray-500 mb-1">Статус</label>
+                        <select id="detail-status" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <option value="none" ${p.status==='none'?'selected':''}>Немає оплати</option>
+                            <option value="advance" ${p.status==='advance'?'selected':''}>Є аванс</option>
+                            <option value="paid" ${p.status==='paid'?'selected':''}>Оплачено</option>
+                        </select></div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 text-center">
+                        <p class="text-xs text-gray-500">Загальна сума</p>
+                        <p class="text-lg font-bold text-indigo-600 dark:text-indigo-400" id="detail-total-display">$${fmt(p.total)}</p>
+                    </div>
+                    <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
+                        <p class="text-xs text-gray-500">Оплачено</p>
+                        <p class="text-lg font-bold text-green-600" id="detail-paid-display">$${fmt(advSum)}</p>
+                    </div>
+                    <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
+                        <p class="text-xs text-gray-500">Заборгованість</p>
+                        <p class="text-lg font-bold text-red-600" id="detail-debt-display">$${fmt(debt)}</p>
+                    </div>
+                </div>
+                <button onclick="saveProjectDetails('${p.id}')" class="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">Зберегти зміни</button>
+            </div>
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="font-semibold">Авансові платежі</h4>
+                    <button onclick="addAdvance('${p.id}')" class="inline-flex items-center gap-1 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Додати аванс
+                    </button>
+                </div>
+                <div id="advances-list">${advancesHtml}</div>
+            </div>
+        </div>`;
+    document.getElementById('detail-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function calcDetailTotal() {
+    const area  = parseFloat(document.getElementById('detail-area')?.value)||0;
+    const price = parseFloat(document.getElementById('detail-price')?.value)||0;
+    document.getElementById('detail-total-display').textContent='$'+fmt(area*price);
+}
+function saveProjectDetails(id) {
+    const p = DB.projects.find(x=>x.id===id);
+    if (!p) return;
+    p.date       = document.getElementById('detail-date').value;
+    p.designerId = document.getElementById('detail-designer').value;
+    p.name       = document.getElementById('detail-name').value.trim();
+    p.area       = parseFloat(document.getElementById('detail-area').value)||0;
+    p.pricePerSqm= parseFloat(document.getElementById('detail-price').value)||0;
+    p.total      = parseFloat((p.area*p.pricePerSqm).toFixed(2));
+    p.status     = document.getElementById('detail-status').value;
+    saveData(); openProjectDetails(id); renderProjects(); showToast('Проект оновлено');
+}
+function addAdvance(projectId) {
+    openModal(`<div class="p-6">
+        <h3 class="text-lg font-bold mb-4">Новий авансовий платіж</h3>
+        <div class="space-y-3">
+            <div><label class="block text-sm font-medium mb-1">Дата *</label>
+                <input type="date" id="advance-date" value="${new Date().toISOString().split('T')[0]}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+            <div><label class="block text-sm font-medium mb-1">Сума, $ *</label>
+                <input type="number" step="0.01" id="advance-amount" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0.00"></div>
+            <div><label class="block text-sm font-medium mb-1">Коментар</label>
+                <input id="advance-comment" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Необов'язково"></div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium transition-colors">Скасувати</button>
+            <button onclick="saveAdvance('${projectId}',-1)" class="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">Зберегти</button>
+        </div>
+    </div>`);
+}
+function editAdvance(projectId,idx) {
+    const p = DB.projects.find(x=>x.id===projectId);
+    if (!p||!p.advances[idx]) return;
+    const a = p.advances[idx];
+    openModal(`<div class="p-6">
+        <h3 class="text-lg font-bold mb-4">Редагувати аванс</h3>
+        <div class="space-y-3">
+            <div><label class="block text-sm font-medium mb-1">Дата *</label>
+                <input type="date" id="advance-date" value="${a.date}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+            <div><label class="block text-sm font-medium mb-1">Сума, $ *</label>
+                <input type="number" step="0.01" id="advance-amount" value="${a.amount}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+            <div><label class="block text-sm font-medium mb-1">Коментар</label>
+                <input id="advance-comment" value="${a.comment||''}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium transition-colors">Скасувати</button>
+            <button onclick="saveAdvance('${projectId}',${idx})" class="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">Зберегти</button>
+        </div>
+    </div>`);
+}
+function saveAdvance(projectId,idx) {
+    const date    = document.getElementById('advance-date').value;
+    const amount  = parseFloat(document.getElementById('advance-amount').value)||0;
+    const comment = document.getElementById('advance-comment').value.trim();
+    if (!date||amount<=0) { showToast('Заповніть дату та суму','error'); return; }
+    const p = DB.projects.find(x=>x.id===projectId);
+    if (!p) return;
+    if (!p.advances) p.advances=[];
+    if (idx===-1) p.advances.push({date,amount,comment});
+    else p.advances[idx]={date,amount,comment};
+    const advSum = calcAdvancesSum(p);
+    if (advSum>=p.total&&p.total>0) p.status='paid';
+    else if (advSum>0) p.status='advance';
+    saveData(); closeModal(); openProjectDetails(projectId); renderProjects(); showToast('Аванс збережено');
+}
+function deleteAdvance(projectId,idx) {
+    showConfirm('Видалити цей аванс?',()=>{
+        const p = DB.projects.find(x=>x.id===projectId);
+        if (!p) return;
+        p.advances.splice(idx,1);
+        const advSum=calcAdvancesSum(p);
+        if (advSum>=p.total&&p.total>0) p.status='paid';
+        else if (advSum>0) p.status='advance';
+        else p.status='none';
+        saveData(); openProjectDetails(projectId); renderProjects(); showToast('Аванс видалено');
+    });
+}
+
+// ====================================================================
+// АРХІВ І КОШИК
+// ====================================================================
+function archiveProject(id) {
+    showConfirm('Відправити проект в архів?',()=>{
+        const p=DB.projects.find(x=>x.id===id);
+        if (p){p.archived=true;saveData();renderProjects();showToast('Проект відправлено в архів');}
+    });
+}
+function renderArchive() {
+    const tbody=document.getElementById('archive-tbody');
+    const empty=document.getElementById('archive-empty');
+    const projects=DB.projects.filter(p=>p.archived&&!p.deleted);
+    if (!projects.length){tbody.innerHTML='';empty.classList.remove('hidden');return;}
+    empty.classList.add('hidden');
+    tbody.innerHTML=projects.map(p=>`
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <td class="px-4 py-3">${new Date(p.date).toLocaleDateString('uk-UA')}</td>
+            <td class="px-4 py-3">${getDesignerName(p.designerId)}</td>
+            <td class="px-4 py-3 font-medium">${p.name}</td>
+            <td class="px-4 py-3 text-right">${fmt(p.area)}</td>
+            <td class="px-4 py-3 text-right font-semibold">$${fmt(p.total)}</td>
+            <td class="px-4 py-3 text-center">
+                <div class="flex gap-1 justify-center">
+                    <button onclick="unarchiveProject('${p.id}')" class="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 font-medium transition-colors">Розархівувати</button>
+                    <button onclick="trashProject('${p.id}')" class="text-xs px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 font-medium transition-colors">В кошик</button>
+                </div>
+            </td>
+        </tr>`).join('');
+}
+function unarchiveProject(id){const p=DB.projects.find(x=>x.id===id);if(p){p.archived=false;saveData();renderArchive();renderProjects();showToast('Проект розархівовано');}}
+function trashProject(id){showConfirm('Відправити в кошик?',()=>{const p=DB.projects.find(x=>x.id===id);if(p){p.deleted=true;p.archived=false;saveData();renderArchive();renderTrash();showToast('Проект в кошику');}});}
+function renderTrash(){
+    const tbody=document.getElementById('trash-tbody');
+    const empty=document.getElementById('trash-empty');
+    const btn=document.getElementById('btn-empty-trash');
+    const projects=DB.projects.filter(p=>p.deleted);
+    if(!projects.length){tbody.innerHTML='';empty.classList.remove('hidden');btn.classList.add('hidden');return;}
+    empty.classList.add('hidden');btn.classList.remove('hidden');
+    tbody.innerHTML=projects.map(p=>`
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <td class="px-4 py-3">${new Date(p.date).toLocaleDateString('uk-UA')}</td>
+            <td class="px-4 py-3">${getDesignerName(p.designerId)}</td>
+            <td class="px-4 py-3 font-medium">${p.name}</td>
+            <td class="px-4 py-3 text-right font-semibold">$${fmt(p.total)}</td>
+            <td class="px-4 py-3 text-center">
+                <div class="flex gap-1 justify-center">
+                    <button onclick="restoreProject('${p.id}')" class="text-xs px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-100 font-medium transition-colors">Відновити</button>
+                    <button onclick="permanentDelete('${p.id}')" class="text-xs px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 font-medium transition-colors">Видалити назавжди</button>
+                </div>
+            </td>
+        </tr>`).join('');
+}
+function restoreProject(id){const p=DB.projects.find(x=>x.id===id);if(p){p.deleted=false;saveData();renderTrash();renderProjects();showToast('Проект відновлено');}}
+function permanentDelete(id){showConfirm('Видалити НАЗАВЖДИ?',()=>{DB.projects=DB.projects.filter(x=>x.id!==id);saveData();renderTrash();showToast('Видалено назавжди');});}
+function emptyTrash(){showConfirm('Очистити весь кошик?',()=>{DB.projects=DB.projects.filter(p=>!p.deleted);saveData();renderTrash();showToast('Кошик очищено');});}
+
+// ====================================================================
+// ФОТОГРАФІЯ
+// ====================================================================
+function renderPhotoshoots(){
+    const tbody=document.getElementById('photo-tbody');
+    const empty=document.getElementById('photo-empty');
+    const shoots=[...DB.photoshoots].sort((a,b)=>new Date(b.date)-new Date(a.date));
+    if(!shoots.length){tbody.innerHTML='';empty.classList.remove('hidden');return;}
+    empty.classList.add('hidden');
+    const typeLabels={photo:'Фото',photo_video:'Фото + Відео',video:'Відео'};
+    tbody.innerHTML=shoots.map(s=>`
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <td class="px-4 py-3 whitespace-nowrap">${new Date(s.date).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+            <td class="px-4 py-3"><span class="badge bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">${typeLabels[s.type]||s.type}</span></td>
+            <td class="px-4 py-3">${getLocationName(s.locationId)}</td>
+            <td class="px-4 py-3">${s.model||'—'}</td>
+            <td class="px-4 py-3 text-right font-semibold">₴${fmt(s.amount)}</td>
+            <td class="px-4 py-3 text-center">
+                <div class="flex gap-1 justify-center">
+                    <button onclick="openPhotoModal('${s.id}')" class="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                    <button onclick="deletePhotoshoot('${s.id}')" class="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                </div>
+            </td>
+        </tr>`).join('');
+}
+function openPhotoModal(id=null){
+    const s=id?DB.photoshoots.find(x=>x.id===id):null;
+    const locOptions=DB.locations.map(l=>`<option value="${l.id}" ${s&&s.locationId===l.id?'selected':''}>${l.name}</option>`).join('');
+    const now=new Date();
+    const defaultDT=s?s.date:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    openModal(`<div class="p-6">
+        <h3 class="text-lg font-bold mb-4">${s?'Редагувати зйомку':'Нова зйомка'}</h3>
+        <div class="space-y-3">
+            <div><label class="block text-sm font-medium mb-1">Дата і час *</label>
+                <input type="datetime-local" id="photo-date" value="${defaultDT}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+            <div><label class="block text-sm font-medium mb-1">Тип зйомки</label>
+                <select id="photo-type" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <option value="photo" ${s&&s.type==='photo'?'selected':''}>Фото</option>
+                    <option value="photo_video" ${s&&s.type==='photo_video'?'selected':''}>Фото + Відео</option>
+                    <option value="video" ${s&&s.type==='video'?'selected':''}>Відео</option>
+                </select></div>
+            <div><label class="block text-sm font-medium mb-1">Локація</label>
+                <select id="photo-location" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <option value="">Без локації</option>${locOptions}</select></div>
+            <div><label class="block text-sm font-medium mb-1">Модель</label>
+                <input id="photo-model" value="${s?(s.model||'):''}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="@instagram або ім'я"></div>
+            <div><label class="block text-sm font-medium mb-1">Сума, ₴ *</label>
+                <input type="number" step="0.01" id="photo-amount" value="${s?s.amount:''}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0.00"></div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium transition-colors">Скасувати</button>
+            <button onclick="savePhotoshoot('${id||''}')" class="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">Зберегти</button>
+        </div>
+    </div>`);
+}
+function savePhotoshoot(id){
+    const date=document.getElementById('photo-date').value;
+    const type=document.getElementById('photo-type').value;
+    const locationId=document.getElementById('photo-location').value;
+    const model=document.getElementById('photo-model').value.trim();
+    const amount=parseFloat(document.getElementById('photo-amount').value)||0;
+    if(!date||amount<=0){showToast('Заповніть дату та суму','error');return;}
+    if(id){const s=DB.photoshoots.find(x=>x.id===id);if(s)Object.assign(s,{date,type,locationId,model,amount});}
+    else DB.photoshoots.push({id:uuid(),date,type,locationId,model,amount});
+    saveData();closeModal();renderPhotoshoots();showToast('Зйомку збережено');
+}
+function deletePhotoshoot(id){showConfirm('Видалити цю зйомку?',()=>{DB.photoshoots=DB.photoshoots.filter(x=>x.id!==id);saveData();renderPhotoshoots();showToast('Зйомку видалено');});}
+
+// ====================================================================
+// ЛОКАЦІЇ
+// ====================================================================
+function openLocationModal(){
+    let html=`<div class="p-6"><div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">Локації</h3>
+        <button onclick="closeModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>
+        <div class="flex gap-2 mb-4">
+            <input id="location-name-input" placeholder="Нова локація..." class="flex-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            <button onclick="addLocation()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">Додати</button>
+        </div><div class="space-y-2" id="locations-list">`;
+    DB.locations.forEach(l=>{
+        html+=`<div class="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <span class="flex-1 text-sm">${l.name}</span>
+            <button onclick="editLocation('${l.id}')" class="p-1 text-indigo-500 hover:text-indigo-700"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+            <button onclick="deleteLocation('${l.id}')" class="p-1 text-red-500 hover:text-red-700"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+        </div>`;
+    });
+    if(!DB.locations.length)html+='<p class="text-center text-gray-400 text-sm py-4">Локацій поки немає</p>';
+    html+=`</div></div>`;
+    openModal(html);
+}
+function addLocation(){
+    const name=document.getElementById('location-name-input').value.trim();
+    if(!name){showToast('Введіть назву локації','error');return;}
+    DB.locations.push({id:uuid(),name});
+    saveData();openLocationModal();showToast('Локацію додано');
+}
+function editLocation(id){
+    const l=DB.locations.find(x=>x.id===id);
+    if(!l)return;
+    const name=prompt('Нова назва локації:',l.name);
+    if(name&&name.trim()){l.name=name.trim();saveData();openLocationModal();showToast('Локацію оновлено');}
+}
+function deleteLocation(id){
+    showConfirm('Видалити цю локацію?',()=>{DB.locations=DB.locations.filter(x=>x.id!==id);saveData();openLocationModal();showToast('Локацію видалено');});
+}
+
+// ====================================================================
+// ІНШІ ДОХОДИ
+// ====================================================================
+function renderOtherIncomes(){
+    const tbody=document.getElementById('other-tbody');
+    const empty=document.getElementById('other-empty');
+    const incomes=[...DB.otherIncomes].sort((a,b)=>new Date(b.date)-new Date(a.date));
+    if(!incomes.length){tbody.innerHTML='';empty.classList.remove('hidden');return;}
+    empty.classList.add('hidden');
+    tbody.innerHTML=incomes.map(i=>`
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <td class="px-4 py-3">${new Date(i.date).toLocaleDateString('uk-UA')}</td>
+            <td class="px-4 py-3">${i.description}</td>
+            <td class="px-4 py-3 text-right font-semibold">₴${fmt(i.amount)}</td>
+            <td class="px-4 py-3 text-center">
+                <div class="flex gap-1 justify-center">
+                    <button onclick="openOtherIncomeModal('${i.id}')" class="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                    <button onclick="deleteOtherIncome('${i.id}')" class="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                </div>
+            </td>
+        </tr>`).join('');
+}
+function openOtherIncomeModal(id=null){
+    const i=id?DB.otherIncomes.find(x=>x.id===id):null;
+    openModal(`<div class="p-6">
+        <h3 class="text-lg font-bold mb-4">${i?'Редагувати запис':'Новий дохід'}</h3>
+        <div class="space-y-3">
+            <div><label class="block text-sm font-medium mb-1">Дата *</label>
+                <input type="date" id="other-date" value="${i?i.date:new Date().toISOString().split('T')[0]}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+            <div><label class="block text-sm font-medium mb-1">Опис *</label>
+                <input id="other-desc" value="${i?i.description:''}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Опис доходу"></div>
+            <div><label class="block text-sm font-medium mb-1">Сума, ₴ *</label>
+                <input type="number" step="0.01" id="other-amount" value="${i?i.amount:''}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0.00"></div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium transition-colors">Скасувати</button>
+            <button onclick="saveOtherIncome('${id||''}')" class="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">Зберегти</button>
+        </div>
+    </div>`);
+}
+function saveOtherIncome(id){
+    const date=document.getElementById('other-date').value;
+    const description=document.getElementById('other-desc').value.trim();
+    const amount=parseFloat(document.getElementById('other-amount').value)||0;
+    if(!date||!description||amount<=0){showToast('Заповніть всі поля','error');return;}
+    if(id){const i=DB.otherIncomes.find(x=>x.id===id);if(i)Object.assign(i,{date,description,amount});}
+    else DB.otherIncomes.push({id:uuid(),date,description,amount});
+    saveData();closeModal();renderOtherIncomes();showToast('Запис збережено');
+}
+function deleteOtherIncome(id){showConfirm('Видалити цей запис?',()=>{DB.otherIncomes=DB.otherIncomes.filter(x=>x.id!==id);saveData();renderOtherIncomes();showToast('Запис видалено');});}
+
+// ====================================================================
+// СТАТИСТИКА
+// ====================================================================
+function populateStatsYears(){
+    const years=new Set();
+    DB.projects.forEach(p=>{if(p.date)years.add(new Date(p.date).getFullYear());});
+    DB.photoshoots.forEach(s=>{if(s.date)years.add(new Date(s.date).getFullYear());});
+    DB.otherIncomes.forEach(i=>{if(i.date)years.add(new Date(i.date).getFullYear());});
+    DB.projects.forEach(p=>{(p.advances||[]).forEach(a=>{if(a.date)years.add(new Date(a.date).getFullYear());});});
+    const sorted=[...years].sort((a,b)=>b-a);
+    ['stats-year','stats-monthly-year'].forEach(sid=>{
+        const sel=document.getElementById(sid);
+        if(!sel)return;
+        const val=sel.value;
+        sel.innerHTML='<option value="">Всі роки</option>';
+        sorted.forEach(y=>{sel.innerHTML+=`<option value="${y}">${y}</option>`;});
+        sel.value=val;
+    });
+}
+function switchStatsTab(tab){
+    document.getElementById('stats-general').classList.toggle('hidden',tab!=='general');
+    document.getElementById('stats-monthly').classList.toggle('hidden',tab!=='monthly');
+    document.getElementById('stats-tab-general').classList.toggle('active',tab==='general');
+    document.getElementById('stats-tab-monthly').classList.toggle('active',tab==='monthly');
+    if(tab==='general')renderStats();else renderMonthlyDetails();
+}
+function renderStats(){
+    const year=document.getElementById('stats-year')?.value;
+    let projects=DB.projects.filter(p=>!p.deleted);
+    if(year)projects=projects.filter(p=>new Date(p.date).getFullYear()===parseInt(year));
+    const totalProjects=projects.length;
+    const totalAdvances=projects.reduce((s,p)=>{
+        let advs=p.advances||[];
+        if(year)advs=advs.filter(a=>new Date(a.date).getFullYear()===parseInt(year));
+        return s+advs.reduce((ss,a)=>ss+parseFloat(a.amount||0),0);
+    },0);
+    const totalDebt=projects.reduce((s,p)=>s+calcDebt(p),0);
+    const avgArea=totalProjects>0?projects.reduce((s,p)=>s+p.area,0)/totalProjects:0;
+    let photos=DB.photoshoots;
+    if(year)photos=photos.filter(s=>new Date(s.date).getFullYear()===parseInt(year));
+    const photoIncome=photos.reduce((s,p)=>s+p.amount,0);
+    let others=DB.otherIncomes;
+    if(year)others=others.filter(i=>new Date(i.date).getFullYear()===parseInt(year));
+    const otherIncome=others.reduce((s,i)=>s+i.amount,0);
+    document.getElementById('stats-cards').innerHTML=`
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"><p class="text-xs text-gray-500 dark:text-gray-400">Всього проектів</p><p class="text-2xl font-bold mt-1">${totalProjects}</p></div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"><p class="text-xs text-gray-500 dark:text-gray-400">3D Аванси отримано</p><p class="text-2xl font-bold mt-1 text-green-600">$${fmt(totalAdvances)}</p></div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"><p class="text-xs text-gray-500 dark:text-gray-400">Заборгованість</p><p class="text-2xl font-bold mt-1 text-red-600">$${fmt(totalDebt)}</p></div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"><p class="text-xs text-gray-500 dark:text-gray-400">Фото дохід</p><p class="text-2xl font-bold mt-1 text-purple-600">₴${fmt(photoIncome)}</p></div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"><p class="text-xs text-gray-500 dark:text-gray-400">Інші доходи</p><p class="text-2xl font-bold mt-1 text-amber-600">₴${fmt(otherIncome)}</p></div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"><p class="text-xs text-gray-500 dark:text-gray-400">Середня площа</p><p class="text-2xl font-bold mt-1">${fmt(avgArea)} м²</p></div>
+    `;
+    renderBarChart(year);
+}
+function renderBarChart(year){
+    const months={};
+    for(let m=0;m<12;m++)months[m]={advances:0,photo:0,other:0};
+    DB.projects.filter(p=>!p.deleted).forEach(p=>{
+        (p.advances||[]).forEach(a=>{
+            const d=new Date(a.date);
+            if(year&&d.getFullYear()!==parseInt(year))return;
+            months[d.getMonth()].advances+=parseFloat(a.amount||0);
+        });
+    });
+    DB.photoshoots.forEach(s=>{
+        const d=new Date(s.date);
+        if(year&&d.getFullYear()!==parseInt(year))return;
+        months[d.getMonth()].photo+=s.amount;
+    });
+    DB.otherIncomes.forEach(i=>{
+        const d=new Date(i.date);
+        if(year&&d.getFullYear()!==parseInt(year))return;
+        months[d.getMonth()].other+=i.amount;
+    });
+    const maxVal=Math.max(...Object.values(months).map(m=>m.advances+m.photo+m.other),1);
+    let chartHtml='<div class="flex items-end gap-1 md:gap-2 h-64">';
+    for(let m=0;m<12;m++){
+        const total=months[m].advances+months[m].photo+months[m].other;
+        const h=total>0?Math.max((total/maxVal)*100,3):0;
+        const advH=(total>0&&months[m].advances>0)?(months[m].advances/total)*100:0;
+        const photoH=(total>0&&months[m].photo>0)?(months[m].photo/total)*100:0;
+        const otherH=(total>0&&months[m].other>0)?(months[m].other/total)*100:0;
+        chartHtml+=`
+            <div class="flex-1 flex flex-col items-center justify-end h-full group">
+                <div class="relative w-full flex flex-col justify-end rounded-t-md overflow-visible" style="height:${h>0?h:0.5}%">
+                    ${total>0?`<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg px-3 py-2 shadow-xl z-30 pointer-events-none" style="min-width:max-content">
+                        <div class="flex items-center gap-1.5 mb-0.5"><span class="w-2 h-2 rounded-sm bg-indigo-400 inline-block"></span>3D: <span class="font-semibold">$${fmt(months[m].advances)}</span></div>
+                        <div class="flex items-center gap-1.5 mb-0.5"><span class="w-2 h-2 rounded-sm bg-purple-400 inline-block"></span>Фото: <span class="font-semibold">₴${fmt(months[m].photo)}</span></div>
+                        <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-amber-400 inline-block"></span>Інше: <span class="font-semibold">₴${fmt(months[m].other)}</span></div>
+                    </div>`:''}
+                    ${advH>0?`<div class="w-full bg-indigo-500 rounded-t-sm" style="height:${advH}%"></div>`:''}
+                    ${photoH>0?`<div class="w-full bg-purple-500 ${advH===0?'rounded-t-sm':''}" style="height:${photoH}%"></div>`:''}
+                    ${otherH>0?`<div class="w-full bg-amber-500 ${advH===0&&photoH===0?'rounded-t-sm':''}" style="height:${otherH}%"></div>`:''}
+                </div>
+                <span class="text-xs text-gray-400 mt-2 select-none">${MONTHS_UA[m].substring(0,3)}</span>
+            </div>`;
+    }
+    chartHtml+='</div>';
+    chartHtml+=`<div class="flex gap-6 mt-4 justify-center text-xs">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-indigo-500 inline-block"></span> 3D Аванси ($)</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-purple-500 inline-block"></span> Фото (₴)</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-amber-500 inline-block"></span> Інші (₴)</span>
+    </div>`;
+    document.getElementById('stats-chart').innerHTML=chartHtml;
+}
+function renderMonthlyDetails(){
+    const year=document.getElementById('stats-monthly-year')?.value;
+    const month=document.getElementById('stats-monthly-month')?.value;
+    const container=document.getElementById('monthly-details-content');
+    if(!year||month===''){container.innerHTML='<div class="text-center text-gray-400 py-12"><p class="font-medium">Оберіть рік та місяць</p></div>';return;}
+    const y=parseInt(year),m=parseInt(month);
+    const advances=[];
+    DB.projects.filter(p=>!p.deleted).forEach(p=>{
+        (p.advances||[]).forEach(a=>{
+            const d=new Date(a.date);
+            if(d.getFullYear()===y&&d.getMonth()===m)advances.push({...a,projectName:p.name,projectId:p.id});
+        });
+    });
+    const photos=DB.photoshoots.filter(s=>{const d=new Date(s.date);return d.getFullYear()===y&&d.getMonth()===m;});
+    const others=DB.otherIncomes.filter(i=>{const d=new Date(i.date);return d.getFullYear()===y&&d.getMonth()===m;});
+    const totalAdv=advances.reduce((s,a)=>s+parseFloat(a.amount||0),0);
+    const totalPhoto=photos.reduce((s,p)=>s+p.amount,0);
+    const totalOther=others.reduce((s,i)=>s+i.amount,0);
+    let html=`<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-4 text-center"><p class="text-xs text-gray-500">3D Аванси</p><p class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">$${fmt(totalAdv)}</p><p class="text-xs text-gray-400 mt-1">${advances.length} платежів</p></div>
+        <div class="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 text-center"><p class="text-xs text-gray-500">Фотозйомки</p><p class="text-2xl font-bold text-purple-600 dark:text-purple-400">₴${fmt(totalPhoto)}</p><p class="text-xs text-gray-400 mt-1">${photos.length} зйомок</p></div>
+        <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 text-center"><p class="text-xs text-gray-500">Інші доходи</p><p class="text-2xl font-bold text-amber-600 dark:text-amber-400">₴${fmt(totalOther)}</p><p class="text-xs text-gray-400 mt-1">${others.length} записів</p></div>
+    </div>`;
+    if(advances.length){
+        html+=`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 mb-4 overflow-hidden">
+            <div class="px-4 py-3 bg-indigo-50 dark:bg-indigo-900/20 font-semibold text-sm text-indigo-700 dark:text-indigo-300">3D Аванси</div>
+            <table class="w-full text-sm"><tbody class="divide-y divide-gray-100 dark:divide-gray-800">`;
+        advances.forEach(a=>{html+=`<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <td class="px-4 py-2">${new Date(a.date).toLocaleDateString('uk-UA')}</td>
+            <td class="px-4 py-2"><button onclick="navigateTo('3d');setTimeout(()=>openProjectDetails('${a.projectId}'),100)" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">${a.projectName}</button></td>
+            <td class="px-4 py-2 text-gray-400">${a.comment||''}</td>
+            <td class="px-4 py-2 text-right font-semibold text-green-600">$${fmt(a.amount)}</td>
+        </tr>`;});
+        html+=`</tbody></table></div>`;
+    }
+    if(photos.length){
+        const typeLabels={photo:'Фото',photo_video:'Фото + Відео',video:'Відео'};
+        html+=`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 mb-4 overflow-hidden">
+            <div class="px-4 py-3 bg-purple-50 dark:bg-purple-900/20 font-semibold text-sm text-purple-700 dark:text-purple-300">Фотозйомки</div>
+            <table class="w-full text-sm"><tbody class="divide-y divide-gray-100 dark:divide-gray-800">`;
+        photos.forEach(s=>{html+=`<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <td class="px-4 py-2">${new Date(s.date).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+            <td class="px-4 py-2">${typeLabels[s.type]||s.type}</td>
+            <td class="px-4 py-2">${s.model||'—'}</td>
+            <td class="px-4 py-2 text-right font-semibold text-purple-600">₴${fmt(s.amount)}</td>
+        </tr>`;});
+        html+=`</tbody></table></div>`;
+    }
+    if(others.length){
+        html+=`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 mb-4 overflow-hidden">
+            <div class="px-4 py-3 bg-amber-50 dark:bg-amber-900/20 font-semibold text-sm text-amber-700 dark:text-amber-300">Інші доходи</div>
+            <table class="w-full text-sm"><tbody class="divide-y divide-gray-100 dark:divide-gray-800">`;
+        others.forEach(i=>{html+=`<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <td class="px-4 py-2">${new Date(i.date).toLocaleDateString('uk-UA')}</td>
+            <td class="px-4 py-2">${i.description}</td>
+            <td class="px-4 py-2 text-right font-semibold text-amber-600">₴${fmt(i.amount)}</td>
+        </tr>`;});
+        html+=`</tbody></table></div>`;
+    }
+    if(!advances.length&&!photos.length&&!others.length)
+        html+='<div class="text-center text-gray-400 py-12"><p class="font-medium">За обраний період даних немає</p></div>';
+    container.innerHTML=html;
+}
+
+// ====================================================================
+// ЕКСПОРТ / ІМПОРТ
+// ====================================================================
+function exportData(){
+    const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`crm-studio-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();URL.revokeObjectURL(url);
+    showToast('Дані експортовано','info');
+}
+function importData(event){
+    const file=event.target.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+        try{
+            const imported=JSON.parse(e.target.result);
+            showConfirm('Імпортувати дані? Поточні дані буде замінено!',()=>{
+                DB={...DB_DEFAULTS,...imported};
+                saveData();initTheme();navigateTo(currentSection);showToast('Дані імпортовано успішно');
+            });
+        }catch{showToast('Помилка: невірний формат файлу','error');}
+    };
+    reader.readAsText(file);
+    event.target.value='';
+}
+
+// ====================================================================
+// ІНІЦІАЛІЗАЦІЯ — перевіряємо сесію Supabase
+// ====================================================================
+async function init() {
+    // Перевіряємо чи є активна сесія
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+        await onLogin(session.user);
+    }
+    // Слухаємо зміни авторизації
+    sb.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) await onLogin(session.user);
+        if (event === 'SIGNED_OUT') location.reload();
+    });
+}
+
+init();
+</script>
+</body>
+</html>
