@@ -475,12 +475,14 @@ const DB_DEFAULTS = {
 let DB = { ...DB_DEFAULTS };
 let currentUserId = null;
 let saveTimer = null;
+let isSaving = false;
+let pendingSave = false;
 
 // ====================================================================
 // SUPABASE: АВТОРИЗАЦІЯ
 // ====================================================================
 async function loginWithGoogle() {
-    const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+    const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: 'https://newcrm-drab.vercel.app' } });
     if (error) showLoginError(error.message);
 }
 
@@ -559,18 +561,28 @@ async function loadFromSupabase() {
 }
 
 function saveData() {
-    // Дебаунс: зберігаємо в хмару не частіше ніж раз в 1 сек
     clearTimeout(saveTimer);
     setSaveStatus('saving');
-    saveTimer = setTimeout(async () => {
-        try {
-            const { error } = await sb
-                .from('crm_data')
-                .upsert({ user_id: currentUserId, data: DB, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-            if (error) { console.error('Save error:', error); setSaveStatus('error'); return; }
-            setSaveStatus('saved');
-        } catch(e) { console.error(e); setSaveStatus('error'); }
-    }, 800);
+    saveTimer = setTimeout(() => executeSave(), 800);
+}
+
+async function executeSave() {
+    if (isSaving) { pendingSave = true; return; }
+    isSaving = true;
+    try {
+        const snapshot = JSON.parse(JSON.stringify(DB));
+        const { error } = await sb
+            .from('crm_data')
+            .upsert({ user_id: currentUserId, data: snapshot, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+        if (error) { console.error('Save error:', error); setSaveStatus('error'); }
+        else { setSaveStatus('saved'); }
+    } catch(e) {
+        console.error('Save exception:', e);
+        setSaveStatus('error');
+    } finally {
+        isSaving = false;
+        if (pendingSave) { pendingSave = false; saveData(); }
+    }
 }
 
 function fmt(n) { return parseFloat(n||0).toFixed(2); }
