@@ -1329,16 +1329,20 @@ function switchStatsTab(tab){
 }
 function renderStats(){
     const year=document.getElementById('stats-year')?.value;
-    let projects=DB.projects.filter(p=>!p.deleted);
+    // Всі проекти (не видалені) — для боргу та площі
+    const allProjects=DB.projects.filter(p=>!p.deleted);
+    // Проекти фільтровані по року старту — для кількості та середньої площі
+    let projects=allProjects;
     if(year)projects=projects.filter(p=>new Date(p.date).getFullYear()===parseInt(year));
     const totalProjects=projects.length;
-    const totalAdvances=projects.reduce((s,p)=>{
+    const avgArea=totalProjects>0?projects.reduce((s,p)=>s+p.area,0)/totalProjects:0;
+    const totalDebt=allProjects.reduce((s,p)=>s+calcDebt(p),0);
+    // Аванси фільтруємо по ДАТІ АВАНСУ (не по даті проекту)
+    const totalAdvances=allProjects.reduce((s,p)=>{
         let advs=p.advances||[];
         if(year)advs=advs.filter(a=>new Date(a.date).getFullYear()===parseInt(year));
         return s+advs.reduce((ss,a)=>ss+parseFloat(a.amount||0),0);
     },0);
-    const totalDebt=projects.reduce((s,p)=>s+calcDebt(p),0);
-    const avgArea=totalProjects>0?projects.reduce((s,p)=>s+p.area,0)/totalProjects:0;
     let photos=DB.photoshoots;
     if(year)photos=photos.filter(s=>new Date(s.date).getFullYear()===parseInt(year));
     const photoIncome=photos.reduce((s,p)=>s+p.amount,0);
